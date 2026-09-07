@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": "$code.length === 6",
+        ".write": "$code.length === 6",
+        "meta": {
+          "max":       { ".validate": "newData.isNumber() && newData.val() >= 3 && newData.val() <= 12" },
+          "impostors": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 4" },
+          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "category":  { ".validate": "newData.val() === 'football' || newData.val() === 'cities' || newData.val() === 'animals' || newData.val() === 'sports'" }
+        },
+        "players": {
+          "$pid": {
+            "nick": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "lang": { ".validate": "newData.val() === 'it' || newData.val() === 'en' || newData.val() === 'fr' || newData.val() === 'es'" }
+          }
+        }
+      }
+    }
+  }
+}
