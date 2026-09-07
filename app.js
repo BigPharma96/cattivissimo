@@ -19,9 +19,9 @@ const S = {
   code: '',
   room: null,
   stop: null,
-  wantsNewRound: false,
   ready: false,
-  scoredRound: 0
+  outcomeShownFor: '',
+  doneRound: ''      // giro che ho già chiuso: mi tiene in lobby fino al prossimo
 };
 
 if (!S.pid) { S.pid = 'p' + Math.random().toString(36).slice(2, 10); LS.set('pid', S.pid); }
@@ -243,7 +243,7 @@ $('#doJoin').addEventListener('click', async () => {
 
 async function enterRoom(code) {
   S.code = code;
-  S.wantsNewRound = false;
+  S.doneRound = '';
   const me = ref(db, 'rooms/' + code + '/players/' + S.pid);
   await set(me, { nick: S.nick, lang: window.APP_LANG, ready: false, ts: Date.now() });
   onDisconnect(me).remove();
@@ -256,7 +256,7 @@ async function enterRoom(code) {
 async function leaveRoom() {
   const code = S.code;
   if (S.stop) { S.stop(); S.stop = null; }
-  S.room = null; S.code = ''; S.wantsNewRound = false;
+  S.room = null; S.code = ''; S.doneRound = '';
   if (!code) return;
   try {
     const me = ref(db, 'rooms/' + code + '/players/' + S.pid);
@@ -289,15 +289,18 @@ function onRoom() {
 
   if (S.room.state === 'playing' && S.room.round) {
     const r = S.room.round;
-    if (r.outcome) {
-      if (S.scoredRound !== r.n) { S.scoredRound = r.n; applyOutcome(r); }
-    } else if (!S.wantsNewRound) {
+    const key = roundKey(r);
+    if (S.doneRound === key) {
+      // questo giro l'ho già chiuso: aspetto in lobby che ricominci
+      if (S.screen !== 'lobby') show('lobby');
+    } else if (r.outcome) {
+      if (S.outcomeShownFor !== key) applyOutcome(r);
+    } else {
       if (S.screen === 'lobby') { renderGame(); show('game'); }
       else if (S.screen === 'game') renderGame();
     }
-  } else {
-    S.wantsNewRound = false;
-    if (S.screen === 'game' || S.screen === 'result' || S.screen === 'again') show('lobby');
+  } else if (S.screen === 'game' || S.screen === 'result' || S.screen === 'again') {
+    show('lobby');
   }
   if (S.screen === 'lobby') renderLobby();
 }
@@ -385,7 +388,12 @@ function renderLobby() {
 
   const full = list.length >= meta.max;
   const btn = $('#readyBtn');
-  if (full && !S.ready) {
+  if (S.room.state === 'playing') {
+    // sto aspettando che gli altri chiudano il giro: premere "pronto" adesso
+    // bloccherebbe la riapertura della stanza
+    btn.style.display = 'none';
+    $('#lobbyMsg').textContent = t('waitingRoundEnd');
+  } else if (full && !S.ready) {
     btn.style.display = ''; btn.disabled = false; btn.textContent = t('ready');
     $('#lobbyMsg').textContent = t('allHere');
   } else if (full && S.ready) {
@@ -455,20 +463,33 @@ $('#nextCorner').addEventListener('click', () => show('result'));
 
 /* ---------------- esito e nuova partita ---------------- */
 
-/* Chi risponde per primo fissa l'esito del giro: da lì l'app deduce
-   il risultato di tutti gli altri in base al ruolo che avevano. */
+/* Chi risponde per primo fissa l'esito del giro: da lì l'app deduce il risultato
+   di tutti gli altri in base al ruolo che avevano, e li porta subito alla schermata
+   finale senza farli rispondere di nuovo. */
+
+function roundKey(r) { return S.code + ':' + (r && r.n ? r.n : 0); }
+
 function declare(iWon) {
   const r = S.room && S.room.round;
   if (!r) { show('home'); return; }
+
+  // se qualcun altro ha già risposto, vale la sua risposta
+  if (r.outcome) { applyOutcome(r); return; }
+
   const amImpostor = !!(r.impostors && r.impostors[S.pid]);
   const outcome = (amImpostor === iWon) ? 'impostors' : 'crew';
-  $('#btnWon').disabled = true; $('#btnLost').disabled = true;
-  update(ref(db, 'rooms/' + S.code + '/round'), { outcome })
-    .catch(() => {})
-    .then(() => { $('#btnWon').disabled = false; $('#btnLost').disabled = false; });
+
+  // la schermata cambia subito: non deve dipendere dalla rete
+  applyOutcome(Object.assign({}, r, { outcome }));
+  update(ref(db, 'rooms/' + S.code + '/round'), { outcome }).catch(() => {});
 }
 
+/* Vale sia per chi risponde sia per chi riceve l'esito dagli altri.
+   La chiave del giro garantisce che il punteggio si conti una volta sola. */
 function applyOutcome(r) {
+  if (S.outcomeShownFor === roundKey(r)) return;
+  S.outcomeShownFor = roundKey(r);
+
   const amImpostor = !!(r.impostors && r.impostors[S.pid]);
   const iWon = (r.outcome === 'impostors') === amImpostor;
   const k = iWon ? 'wins' : 'losses';
@@ -486,7 +507,7 @@ $('#btnWon').addEventListener('click', () => declare(true));
 $('#btnLost').addEventListener('click', () => declare(false));
 
 $('#btnAgain').addEventListener('click', () => {
-  S.wantsNewRound = true;
+  S.doneRound = roundKey(S.room && S.room.round);
   update(ref(db, 'rooms/' + S.code + '/players/' + S.pid), { ready: false }).catch(() => {});
   show('lobby');
 });

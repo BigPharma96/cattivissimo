@@ -80,6 +80,9 @@ già preparata con i margini giusti.
 8. All'esito risponde una persona sola: dice se ha vinto o perso, e l'app deduce da lì il
    risultato di tutti gli altri in base al ruolo che avevano. Se un giocatore normale dice
    di aver vinto, gli impostori risultano sconfitti e gli altri giocatori vincitori.
+   Appena qualcuno risponde, tutti gli altri passano direttamente alla schermata
+   "un'altra partita / torna alla home" con il proprio verdetto già calcolato: nessuno
+   deve rispondere due volte e ogni partita viene conteggiata una volta sola.
 
 La nazione di riferimento per le parole (capoluoghi, campionato, atleti nazionali) è
 quella della lingua scelta dalla maggioranza dei giocatori; in caso di parità è l'Italia.
