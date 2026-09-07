@@ -20,7 +20,8 @@ const S = {
   room: null,
   stop: null,
   wantsNewRound: false,
-  ready: false
+  ready: false,
+  scoredRound: 0
 };
 
 if (!S.pid) { S.pid = 'p' + Math.random().toString(36).slice(2, 10); LS.set('pid', S.pid); }
@@ -287,7 +288,10 @@ function onRoom() {
   hostDuties(list);
 
   if (S.room.state === 'playing' && S.room.round) {
-    if (!S.wantsNewRound) {
+    const r = S.room.round;
+    if (r.outcome) {
+      if (S.scoredRound !== r.n) { S.scoredRound = r.n; applyOutcome(r); }
+    } else if (!S.wantsNewRound) {
       if (S.screen === 'lobby') { renderGame(); show('game'); }
       else if (S.screen === 'game') renderGame();
     }
@@ -363,8 +367,15 @@ function renderLobby() {
   const list = playerList();
   const meta = S.room.meta;
   $('#counter').textContent = list.length + '/' + meta.max;
-  $('#roomTag').textContent = t('roomTag', { r: meta.name, c: t('cat' + cap(meta.category)) });
+  $('#roomTag').textContent = t('roomTag', { r: meta.name });
   $('#codeChip').textContent = S.code;
+
+  const amHost = meta.host === S.pid;
+  const catSel = $('#lobbyCategory');
+  if (document.activeElement !== catSel) catSel.value = meta.category;
+  catSel.disabled = !amHost;
+  const hostPlayer = list.find(p => p.id === meta.host);
+  $('#catHint').textContent = amHost ? '' : t('catHostOnly', { h: (hostPlayer && hostPlayer.nick) || t('host') });
 
   $('#players').innerHTML = list.map(p =>
     '<li>' + escapeHtml(p.nick) +
@@ -394,6 +405,14 @@ function escapeHtml(s) {
 $('#readyBtn').addEventListener('click', () => {
   $('#readyBtn').disabled = true;
   update(ref(db, 'rooms/' + S.code + '/players/' + S.pid), { ready: true }).catch(() => {});
+});
+
+$('#lobbyCategory').addEventListener('change', (e) => {
+  if (!S.room || S.room.meta.host !== S.pid) return;
+  const value = e.target.value;
+  update(ref(db, 'rooms/' + S.code + '/meta'), { category: value })
+    .then(() => toast(t('catChanged', { c: t('cat' + cap(value)) })))
+    .catch(() => {});
 });
 
 $('#codeChip').addEventListener('click', async () => {
@@ -436,14 +455,35 @@ $('#nextCorner').addEventListener('click', () => show('result'));
 
 /* ---------------- esito e nuova partita ---------------- */
 
-function record(win) {
-  const k = win ? 'wins' : 'losses';
+/* Chi risponde per primo fissa l'esito del giro: da lì l'app deduce
+   il risultato di tutti gli altri in base al ruolo che avevano. */
+function declare(iWon) {
+  const r = S.room && S.room.round;
+  if (!r) { show('home'); return; }
+  const amImpostor = !!(r.impostors && r.impostors[S.pid]);
+  const outcome = (amImpostor === iWon) ? 'impostors' : 'crew';
+  $('#btnWon').disabled = true; $('#btnLost').disabled = true;
+  update(ref(db, 'rooms/' + S.code + '/round'), { outcome })
+    .catch(() => {})
+    .then(() => { $('#btnWon').disabled = false; $('#btnLost').disabled = false; });
+}
+
+function applyOutcome(r) {
+  const amImpostor = !!(r.impostors && r.impostors[S.pid]);
+  const iWon = (r.outcome === 'impostors') === amImpostor;
+  const k = iWon ? 'wins' : 'losses';
   LS.set(k, String((parseInt(LS.get(k, '0'), 10) || 0) + 1));
+
+  const v = $('#verdict');
+  v.textContent = t(iWon ? 'verdictWon' : 'verdictLost');
+  v.classList.toggle('verdict-lost', !iWon);
+  $('#outcomeLine').textContent = t(r.outcome === 'impostors' ? 'impostorsWon' : 'crewWon');
   $('#scoreLine').textContent = t('scoreLine', { w: LS.get('wins', '0'), l: LS.get('losses', '0') });
   show('again');
 }
-$('#btnWon').addEventListener('click', () => record(true));
-$('#btnLost').addEventListener('click', () => record(false));
+
+$('#btnWon').addEventListener('click', () => declare(true));
+$('#btnLost').addEventListener('click', () => declare(false));
 
 $('#btnAgain').addEventListener('click', () => {
   S.wantsNewRound = true;

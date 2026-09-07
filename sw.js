@@ -3,7 +3,7 @@
    config.js NON viene mai messo in cache: così le chiavi Firebase
    aggiornate vengono lette subito senza svuotare la cache a mano. */
 
-const CACHE_VERSION = 'cattivissimo-v1';
+const CACHE_VERSION = 'cattivissimo-v3';
 
 const SHELL = [
   './',

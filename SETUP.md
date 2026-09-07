@@ -70,11 +70,16 @@ già preparata con i margini giusti.
 3. Gli altri scelgono *Entra in una stanza* e digitano lo stesso codice.
 4. Quando il contatore in alto arriva a `4/4` compare il pulsante **Sono pronto/a**.
    Appena tutti hanno premuto, la partita parte.
-5. Chi non è impostore vede la parola in bianco. Gli impostori vedono, in rosso, una
+5. In lobby il capo stanza può cambiare categoria quando vuole: il cambio vale dal
+   giro successivo, senza uscire e rifare la stanza.
+6. Chi non è impostore vede la parola in bianco. Gli impostori vedono, in rosso, una
    parola diversa ma dello stesso ambito: se i giocatori hanno *Leone*, gli impostori
    hanno *Tigre*; se hanno *Baggio*, gli impostori hanno *Totti*.
-6. Si gioca dal vivo. Alla fine: la casetta in basso a sinistra torna al menu, la freccia
+7. Si gioca dal vivo. Alla fine: la casetta in basso a sinistra torna al menu, la freccia
    in basso a destra porta alla schermata dell'esito e poi alla scelta se rigiocare.
+8. All'esito risponde una persona sola: dice se ha vinto o perso, e l'app deduce da lì il
+   risultato di tutti gli altri in base al ruolo che avevano. Se un giocatore normale dice
+   di aver vinto, gli impostori risultano sconfitti e gli altri giocatori vincitori.
 
 La nazione di riferimento per le parole (capoluoghi, campionato, atleti nazionali) è
 quella della lingua scelta dalla maggioranza dei giocatori; in caso di parità è l'Italia.

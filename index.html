@@ -148,6 +148,10 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   align-self:center;background:var(--bianco);color:var(--nero);border:4px solid var(--nero);border-radius:14px;
   padding:8px 18px;font-size:26px;letter-spacing:.24em;box-shadow:0 4px 0 rgba(11,27,51,.5);cursor:pointer;
 }
+.catbox{max-width:400px;width:100%;align-self:center}
+.catbox select:disabled{opacity:.75;background:#E7EEF7}
+.hint{margin:-8px 0 0;font-size:14px;font-weight:600;opacity:.85;text-align:center;min-height:1px}
+.verdict-lost{color:var(--rosso)}
 .plist{list-style:none;padding:0;margin:6px 0 0;display:flex;flex-direction:column;gap:8px;width:100%;max-width:400px}
 .plist li{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.16);border:3px solid rgba(11,27,51,.55);border-radius:13px;padding:9px 13px;font-size:17px}
 .plist li .tick{margin-left:auto;font-size:18px}
@@ -354,6 +358,15 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
     <h1 class="counter ol" id="counter">0/0</h1>
     <p class="roomtag" id="roomTag"></p>
     <button class="codechip" id="codeChip"></button>
+    <label class="field catbox"><span data-t="category"></span>
+      <select id="lobbyCategory">
+        <option value="football" data-t="catFootball"></option>
+        <option value="cities" data-t="catCities"></option>
+        <option value="animals" data-t="catAnimals"></option>
+        <option value="sports" data-t="catSports"></option>
+      </select>
+    </label>
+    <p class="hint" id="catHint"></p>
     <ul class="plist" id="players"></ul>
     <div class="spacer"></div>
     <p class="sub" id="lobbyMsg"></p>
@@ -378,6 +391,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   <section id="result" class="screen">
     <div class="wrap">
       <h1 class="head ol" data-t="resultQ"></h1>
+      <p class="sub" data-t="resultHint"></p>
       <button class="btn" id="btnWon" data-t="won"></button>
       <button class="btn white" id="btnLost" data-t="lost"></button>
     </div>
@@ -386,8 +400,9 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
   <!-- ============ ANCORA? ============ -->
   <section id="again" class="screen">
     <div class="wrap">
-      <h1 class="head ol" id="scoreLine"></h1>
-      <p class="sub" data-t="againQ"></p>
+      <h1 class="head ol" id="verdict"></h1>
+      <p class="sub" id="outcomeLine"></p>
+      <p class="sub" id="scoreLine" style="opacity:.8"></p>
       <button class="btn" id="btnAgain" data-t="again"></button>
       <button class="btn white" id="btnHome" data-t="home"></button>
     </div>
@@ -414,7 +429,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js"></script>
+<script src="config.js?v=3"></script>
 <script src="words.js"></script>
 <script src="i18n.js"></script>
 <script type="module" src="app.js"></script>
