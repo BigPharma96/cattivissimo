@@ -67,7 +67,11 @@ già preparata con i margini giusti.
 1. Ognuno apre l'app, scrive il nickname e sceglie la lingua.
 2. Uno crea la stanza: nome, numero di giocatori, numero di impostori, se gli impostori
    si riconoscono tra loro, categoria e un codice di 6 caratteri.
-3. Gli altri scelgono *Entra in una stanza* e digitano lo stesso codice.
+3. Gli altri scelgono *Entra in una stanza* e digitano lo stesso codice. Il codice resta
+   occupato solo finché qualcuno è dentro: quando esce l'ultimo giocatore la stanza
+   sparisce e quel codice torna libero per un'altra volta. Chi esce per sbaglio a
+   partita in corso può rientrare con lo stesso codice e ritrova la sua parola e il
+   suo ruolo.
 4. Quando il contatore in alto arriva a `4/4` compare il pulsante **Sono pronto/a**.
    Appena tutti hanno premuto, la partita parte.
 5. In lobby il capo stanza può cambiare categoria quando vuole: il cambio vale dal
@@ -91,10 +95,18 @@ quella della lingua scelta dalla maggioranza dei giocatori; in caso di parità �
 
 ## Modificare le parole
 
-Tutto sta in `words.js`. Ogni categoria contiene dei **gruppi**: la parola dei giocatori
-e quella degli impostori vengono sempre pescate dallo stesso gruppo, ed è questo che
-tiene la coppia coerente. Per aggiungere parole basta allungare un gruppo esistente o
-aggiungerne uno nuovo.
+Tutto sta in `words.js`. Ogni categoria contiene dei **gruppi stretti e sovrapposti**:
+la stessa parola compare di proposito in più gruppi, e la parola dell'impostore viene
+pescata dall'unione dei gruppi che contengono la parola dei giocatori. È questo che
+tiene alta la varietà senza perdere la pertinenza: "Leone" può fare coppia con Tigre,
+Ghepardo, Leopardo, Giaguaro, Puma, Iena o Sciacallo, ma mai con Ippopotamo.
+
+Se aggiungi parole, tieni i gruppi **stretti**: meglio "grandi erbivori africani" che
+"animali della savana". Per dare più compagni possibili a una parola, inseriscila in
+più gruppi invece di allargarne uno.
+
+La stanza ricorda le ultime quindici parole uscite e le esclude, così lo stesso termine
+non ricapita a giri ravvicinati.
 
 - Nome proprio uguale in tutte le lingue → una stringa: `'Del Piero'`
 - Parola da tradurre → un array nell'ordine `[italiano, inglese, francese, spagnolo]`:

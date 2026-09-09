@@ -198,7 +198,15 @@ $('#doCreate').addEventListener('click', async () => {
 
   try {
     const snap = await get(roomRef(code));
-    if (snap.exists()) { setErr('#createErr', t('errExists')); return; }
+    if (snap.exists()) {
+      const old = snap.val() || {};
+      const alive = old.players ? Object.keys(old.players).length : 0;
+      const age = Date.now() - ((old.meta && old.meta.at) || 0);
+      // una stanza senza più nessuno dentro (o dimenticata da mezza giornata)
+      // non tiene occupato il codice: la si butta e si ricomincia
+      if (alive === 0 || age > 12 * 60 * 60 * 1000) await remove(roomRef(code));
+      else { setErr('#createErr', t('errExists')); return; }
+    }
     await set(roomRef(code), {
       meta: { name, host: S.pid, max, impostors: imp, know, category, at: Date.now() },
       state: 'lobby'
@@ -228,9 +236,11 @@ $('#doJoin').addEventListener('click', async () => {
     const room = snap.val();
     const players = room.players || {};
     const mine = !!players[S.pid];
-    if (!mine && Object.keys(players).length >= room.meta.max) { setErr('#joinErr', t('errFull')); return; }
-    if (!mine && room.state === 'playing') { setErr('#joinErr', t('errStarted')); return; }
-    await enterRoom(code);
+    // chi era già nel giro in corso può sempre rientrare: è uscito per sbaglio
+    const wasHere = !!(room.round && room.round.roster && room.round.roster[S.pid]);
+    if (!mine && !wasHere && Object.keys(players).length >= room.meta.max) { setErr('#joinErr', t('errFull')); return; }
+    if (!mine && !wasHere && room.state === 'playing') { setErr('#joinErr', t('errStarted')); return; }
+    await enterRoom(code, room.state === 'playing' && wasHere);
   } catch (err) {
     console.error(err);
     setErr('#joinErr', t('errNet'));
@@ -241,16 +251,18 @@ $('#doJoin').addEventListener('click', async () => {
 
 /* ---------------- ciclo di vita della stanza ---------------- */
 
-async function enterRoom(code) {
+async function enterRoom(code, resumeGame) {
   S.code = code;
   S.doneRound = '';
   const me = ref(db, 'rooms/' + code + '/players/' + S.pid);
-  await set(me, { nick: S.nick, lang: window.APP_LANG, ready: false, ts: Date.now() });
+  // chi rientra a partita in corso torna dentro già "pronto", così non blocca gli altri
+  await set(me, { nick: S.nick, lang: window.APP_LANG, ready: !!resumeGame, ts: Date.now() });
   onDisconnect(me).remove();
   if (S.stop) S.stop();
   S.stop = onValue(roomRef(code), (snap) => { S.room = snap.val(); onRoom(); });
   show('lobby');
-  renderLobby();
+  // rivaluto subito: se la partita è già in corso e sto rientrando, vado alla parola
+  if (S.room) onRoom(); else renderLobby();
 }
 
 async function leaveRoom() {
@@ -262,8 +274,10 @@ async function leaveRoom() {
     const me = ref(db, 'rooms/' + code + '/players/' + S.pid);
     await onDisconnect(me).cancel();
     await remove(me);
+    // se ero l'ultimo, la stanza sparisce e il codice torna disponibile
     const snap = await get(ref(db, 'rooms/' + code + '/players'));
-    if (!snap.exists()) await remove(roomRef(code));
+    const left = snap.exists() ? Object.keys(snap.val() || {}).length : 0;
+    if (left === 0) await remove(roomRef(code));
   } catch (err) { console.error(err); }
 }
 
@@ -343,7 +357,9 @@ function toLangObject(item) {
 function startRound(list) {
   const meta = S.room.meta;
   const nation = mainNation(list);
-  const pair = window.pickWordPair(meta.category, nation);
+  const recent = Array.isArray(S.room.recent) ? S.room.recent : [];
+  const pair = window.pickWordPair(meta.category, nation, recent);
+  if (!pair) return;
   const ids = list.map(p => p.id);
   for (let i = ids.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -351,6 +367,8 @@ function startRound(list) {
   }
   const impostors = {};
   ids.slice(0, Math.min(meta.impostors, ids.length - 1)).forEach(id => { impostors[id] = true; });
+  const roster = {};
+  ids.forEach(id => { roster[id] = true; });
 
   update(roomRef(S.code), {
     state: 'playing',
@@ -358,8 +376,10 @@ function startRound(list) {
       n: ((S.room.round && S.room.round.n) || 0) + 1,
       main: toLangObject(pair.main),
       decoy: toLangObject(pair.decoy),
-      impostors, nation, at: Date.now()
-    }
+      impostors, roster, nation, at: Date.now()
+    },
+    // memoria delle ultime parole uscite, per non ripeterle a giri ravvicinati
+    recent: [pair.key].concat(recent).slice(0, 15)
   }).catch(err => console.error(err));
 }
 
@@ -487,13 +507,20 @@ function declare(iWon) {
 /* Vale sia per chi risponde sia per chi riceve l'esito dagli altri.
    La chiave del giro garantisce che il punteggio si conti una volta sola. */
 function applyOutcome(r) {
-  if (S.outcomeShownFor === roundKey(r)) return;
-  S.outcomeShownFor = roundKey(r);
+  const key = roundKey(r);
+  if (S.outcomeShownFor === key) return;
+  S.outcomeShownFor = key;
 
   const amImpostor = !!(r.impostors && r.impostors[S.pid]);
   const iWon = (r.outcome === 'impostors') === amImpostor;
-  const k = iWon ? 'wins' : 'losses';
-  LS.set(k, String((parseInt(LS.get(k, '0'), 10) || 0) + 1));
+
+  // un solo punto per giocatore per giro: la chiave del giro resta scritta anche
+  // su disco, così nemmeno un ricaricamento della pagina può contarlo due volte
+  if (LS.get('scored', '') !== key) {
+    LS.set('scored', key);
+    const k = iWon ? 'wins' : 'losses';
+    LS.set(k, String((parseInt(LS.get(k, '0'), 10) || 0) + 1));
+  }
 
   const v = $('#verdict');
   v.textContent = t(iWon ? 'verdictWon' : 'verdictLost');
